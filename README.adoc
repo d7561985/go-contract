@@ -167,6 +167,7 @@ yes. create chaincode = `mycc` and instantiate  our smart contract `mycc` in our
 $ docker exec -it cli sh
 
 $ cd chaincode
+$ rm go.sum && go mod download
 $ peer chaincode install -p /opt/gopath/src/chaincodedev/chaincode -n mycc -v 0
 peer chaincode instantiate -n mycc -v 0 -c '{"Args":[]}' -C myc
 $ peer chaincode instantiate -n mycc -v 0 -c '{"Args":[]}' -C myc
