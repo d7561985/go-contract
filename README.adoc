@@ -1,0 +1,203 @@
+== go-contract
+Hyperledger fabric simple queue implementation
+
+== Requirement
+.Go language
+minor 1.13
+
+
+== State databases
+https://hyperledger-fabric.readthedocs.io/en/latest/couchdb_tutorial.html#why-couchdb
+
+=== LevelDB
+> LevelDB stores chaincode data as simple key-value pairs and only supports key, key range, and composite key queries.
+
+.Challenges
+ * Sorting / Reordering require extraction operated data and perform manual operation on them
+ * Strict asset model without resiliency. (way with passing JSON as parameter can be, but we should write own NO-SQL DB functionality)
+
+=== CouchDB
+not implemented
+
+== CLI
+[source,bash]
+----
+peer chaincode instantiate -n queue -v 0 -c '{"Args":[]}' -C myc
+----
+
+.InitLedger
+Fixtures data
+[source,bash]
+----
+peer chaincode invoke -n mycc -c '{"Args":["InitLedger"]}' -C myc
+----
+
+.Get
+obtain existent asset with uniq key
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["Get", "1589702933-757936000"]}' -C myc
+----
+
+.Update
+update existent asset context, third argument JSON structure with char escape
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["Update", "1589702933-757936000", "{\"country\":\"RU\"}"]}' -C myc
+----
+
+.Delete
+delete existent object, if asset not exists return error
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["Delete", "1589702933-757936000"]}' -C myc
+----
+
+.GetAll
+return all element in queue
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["GetAll"]}' -C myc
+----
+
+.GetRange
+retrieve specific rage of queue assets
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["GetRange", "0", "1558080533-00000000"]}' -C myc
+# peer chaincode invoke -n mycc -c '{"Args":["GetRange", "0", "1305619733-758090001"]}' -C myc
+----
+
+.Query
+Query extract list of element using operation query
+
+Supported operations uses url query syntax and support followed arguments:
+
+@from - select from which key should performed result extraction. Empty uses as from beggining
+
+@to - select to which key should be performed range extraction. (provided value excluded). Empty till NOW
+
+@Filter - extra context filtering result. Uses = separator and support only equation.
+
+ example: filter=country=RU
+
+@Sort - order result with some provided context field, if field not exists result will be in the end of slice
+
+ ascending example: Sort=country
+ descending example: Sort=-country
+
+Sort require all context data provided with type consistency
+
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["Query", "from=0&to=1558080533-00000000&sort=country&filter=country=BY"]}' -C myc
+
+# peer chaincode invoke -n mycc -c '{"Args":["Query", "sort=country"]}' -C myc
+
+# peer chaincode invoke -n mycc -c '{"Args":["Query", "filter=country=RU2"]}' -C myc
+----
+
+.PushBack
+create new asset
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["PushBack", ""]}' -C myc
+
+# peer chaincode invoke -n mycc -c '{"Args":["PushBack", "{}"]}' -C myc
+
+# peer chaincode invoke -n mycc -c '{"Args":["PushBack", "{\"country\":\"BY\"}"]}' -C myc
+----
+
+.Front
+access to the first element
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["Front"]}' -C myc
+----
+
+.Back
+[source,bash]
+access to the last element
+----
+# peer chaincode invoke -n mycc -c '{"Args":["Back"]}' -C myc
+----
+
+.Pop
+get last element and remove them
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["Pop"]}' -C myc
+----
+
+.Swap
+swap extra context between 2 elements
+[source,bash]
+----
+# peer chaincode invoke -n mycc -c '{"Args":["Swap","1305619733-758090000", "1337242133-758089000"]}' -C myc
+----
+
+== Test
+[source,bash]
+----
+# go test -race -tags unit -covermode=atomic ./...
+
+----
+
+== Development environment
+Require docker-composer.  Folder `chaincode-docker-devmode` based on https://github.com/hyperledger/fabric-samples/tree/v2.1.0/chaincode-docker-devmode with small changes for local development.
+
+Some useful info:
+* https://github.com/hyperledger/fabric-contract-api-go/blob/master/tutorials/getting-started.md
+* https://github.com/hyperledger/fabric-samples/tree/v2.1.0/chaincode-docker-devmode
+
+=== Terminal 1. start container environment
+[source,bash]
+----
+$ cd chaincode-docker-devmode
+$ docker-compose -f docker-compose-simple.yaml up
+----
+
+internal script create channel `myc` with which we will be working
+
+=== Terminal 2. Instantiate.
+yes. create chaincode = `mycc` and instantiate  our smart contract `mycc` in our chanel `myc`
+
+[source,bash]
+----
+$ docker exec -it cli sh
+
+$ cd chaincode
+$ peer chaincode install -p /opt/gopath/src/chaincodedev/chaincode -n mycc -v 0
+peer chaincode instantiate -n mycc -v 0 -c '{"Args":[]}' -C myc
+$ peer chaincode instantiate -n mycc -v 0 -c '{"Args":[]}' -C myc
+----
+
+=== Terminal 3.
+local environment just run our code. composer's exposed all required port to local environment.
+
+[source,bash]
+---
+CORE_CHAINCODE_ID_NAME=mycc:0 CORE_PEER_TLS_ENABLED=false go run simple-contract.go -peer.address peer:7052
+---
+
+== Features
+
+* LevelDB simple queue smart contract
+** Uniq key handling via time base with low collision possibility because of using nanosecond postfix
+** reach API
+*** `Get`
+*** `Update`
+*** `Delete`
+*** `GetAll`
+*** `GetRange`
+*** `Query`
+*** `PushBack`
+*** `Front`
+*** `Back`
+*** `Pop`
+*** `Swap`
+
+* unit test coverage via build flag `unit`
+* golangci-lint pass
+* range extraction support different direction.
+* docker-container environment
